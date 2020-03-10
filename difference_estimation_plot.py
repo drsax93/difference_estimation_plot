@@ -123,7 +123,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
             ax.plot(n+x_offset, m_binCentres.mean()-offset, 'ko', markersize=10) # plot black dot
             ax.fill(m_pdf + n+x_offset, m_binCentres-offset, color=color_palette[n+x_offset]) # plot dist
             ax.vlines(n+x_offset, CI_[0]-offset, CI_[1]-offset, linewidth=2) # plot CI
-        x_offset+=n+1x
+        x_offset+=n+1
     # labels and axes lims
     ax.set_ylabel(bootPlot_kw['label'])
     miny = np.min([-0.05, np.min(min_bc)])
