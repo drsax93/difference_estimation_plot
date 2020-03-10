@@ -55,8 +55,8 @@ def swarmplot(df, indeces, ax, spread=5, trend=1, operation=np.mean,
     ax.set_ylabel(swarmPlot_kw['label'])
     ax.set_xlim(-1/spread, nC-1 +1/spread)
     miny = np.nanmin(df); maxy = np.nanmax(df)
-    eps = (miny/10-0.05, maxy/10+0.05)
-    ax.set_ylim(miny+eps[0], maxy+eps[1])
+    eps = (maxy - miny)/10
+    ax.set_ylim(miny-eps, maxy+eps)
     sns.despine(ax=ax)
     
     return ax
@@ -128,8 +128,8 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
     ax.set_ylabel(bootPlot_kw['label'])
     miny = np.min([-0.05, np.min(min_bc)])
     maxy = np.max([0.05, np.max(max_bc)])
-    eps = (miny/10-0.05, maxy/10+0.05)
-    ax.set_ylim(miny+eps[0], maxy+eps[1])
+    eps = (maxy - miny)/10
+    ax.set_ylim(miny-eps, maxy+eps)
     ax.set_xlim(-2/spread, nCtot-1 +2/spread)
     sns.despine(ax=ax)
         
