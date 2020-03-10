@@ -10,10 +10,10 @@ import seaborn as sns
 
 # SWARMPLOT
 
-def swarmplot(df, indeces, ax, spread=5, trend=1, operation=np.mean,
+def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
               SWARM = 1, swarmPlot_kw=None, trendPlot_kw=None,
               color_palette=sns.set_palette('bright',10)):
-    nCols = df.columns; ns = len(df) # total number of groups and samples
+    nCols = len(df.columns); ns = len(df) # total number of groups and samples
     xticks = []; xlab = []
     x_offset = 0
     for index in indeces: # loop over lists of ggroups (multiple controls)
@@ -53,11 +53,14 @@ def swarmplot(df, indeces, ax, spread=5, trend=1, operation=np.mean,
     # set axis label and lims
     plt.xticks(xticks, xlab)
     ax.set_ylabel(swarmPlot_kw['label'])
-    ax.set_xlim(-1/spread, nC-1 +1/spread)
+    ax.set_xlim(-1/spread, nCols-1 +1/spread)
     miny = np.nanmin(df); maxy = np.nanmax(df)
     eps = (maxy - miny)/10
     ax.set_ylim(miny-eps, maxy+eps)
     sns.despine(ax=ax)
+    if vert:
+        sns.despine(ax=ax, bottom=True)
+        ax.set_xticks([])
     
     return ax
 
@@ -86,7 +89,12 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
                     nbins=50, ci=.95, spread=5, SMOOTH=[1,1],
                    bootPlot_kw=None, color_palette=sns.set_palette('bright',10)):
     if bootPlot_kw is None:
-        bootPlot_kw = {'label':'Difference plot'}
+        if operation==np.mean:
+            bootPlot_kw = {'label':'Mean difference'}
+        elif operation==np.median:
+            bootPlot_kw = {'label':'Median difference'}
+        else:
+            bootPlot_kw = {'label':'Unknown statistics'}
     x_offset = 0; nCtot = 0 # x-axis offset for multiple controls; total number of groups
     min_bc = []; max_bc = [] # mins and max values for y axis lims
 
@@ -103,7 +111,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
             y_ = df[i]; y_ = np.asarray(y_[~np.isnan(y_)]) # exclude possible nans if unpaired analysis
             m_ = bootstrap(y_, nsh=nsh, operation=operation) # perform bootstrap
             m_h = np.histogram(m_, bins=nbins)
-            m_pdf = m_h[0] / (np.max(m_h[0]) * 2*spread) # obtain normalised dist to fit the swarmplot spread
+            m_pdf = m_h[0] / (np.max(m_h[0]) * spread) # obtain normalised dist to fit the swarmplot spread
             m_binCentres = []
             for mn in range(len(m_h[0])): # obtain the centres of the hist bins
                 m_binCentres.append(np.mean([m_h[1][mn+1], m_h[1][mn]]))
@@ -112,6 +120,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
             max_bc.append(np.max(m_binCentres)-offset)
             if SMOOTH[0]: # smooth dist wit gaussian
                 m_pdf = gaussian_filter1d(m_pdf, SMOOTH[1])
+            m_pdf[0] = 0; m_pdf[-1] = 0 # make sure distribution touches CI line
             # find conf interval - take samples from sorted dist
             ci_ind = np.round((nsh - nsh*ci)/2).astype(int)
             m_sort = np.sort(m_)
@@ -122,7 +131,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
             # Plot distribution
             ax.plot(n+x_offset, m_binCentres.mean()-offset, 'ko', markersize=10) # plot black dot
             ax.fill(m_pdf + n+x_offset, m_binCentres-offset, color=color_palette[n+x_offset]) # plot dist
-            ax.vlines(n+x_offset, CI_[0]-offset, CI_[1]-offset, linewidth=2) # plot CI
+            ax.vlines(n+x_offset, CI_[0]-offset, CI_[1]-offset, linewidth=3) # plot CI
         x_offset+=n+1
     # labels and axes lims
     ax.set_ylabel(bootPlot_kw['label'])
@@ -130,7 +139,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
     maxy = np.max([0.05, np.max(max_bc)])
     eps = (maxy - miny)/10
     ax.set_ylim(miny-eps, maxy+eps)
-    ax.set_xlim(-2/spread, nCtot-1 +2/spread)
+    ax.set_xlim(-1/spread, nCtot-1 + 1/spread)
     sns.despine(ax=ax)
         
     return ax
@@ -142,8 +151,8 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
 def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
                     operation=np.mean, SWARM=1, nsh=5000, ci=.95, nbins=50,
                     SMOOTH=[1,3], swarmPlot_kw=None, bootPlot_kw=None,
-                    color_palette=sns.color_palette('bright',10),
-                    FontScale=2):
+                    trendPlot_kw=None, color_palette=sns.color_palette('bright',10),
+                    FontScale=2, figsize=None):
     ''' INPUTS:
     - input_ = dict() containing the samples, indeces are labels
     - indeces = list of indeces used for multiple control analysis;
@@ -164,8 +173,10 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
             bootstrapped distribution, the second indicates the SD
     - swarmPlot_kw = keywords to modify the style of swarmPlot (to insert more)
     - bootPlot_kw = keywords to modify the style of difference plot (to insert more)
+    - trendPlot_kw = keywords to modify the style of trend line plot
     - color_palette = seaborn color_palette or list of colors to use\
     - FontScale = seaborn font_scale parameter
+    - figsize = size of the figure to plot as per plt figsize parameter
 
     OUTPUTS:
     fig, axs = figure and 2 axes handles
@@ -180,16 +191,18 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
     # Set up the figure
     sns.set(font_scale=FontScale); sns.set_style('ticks')
     if vertical: # Cumming's est plot
-        fig, axs = plt.subplots(2, sharex=True, sharey=False,
-            gridspec_kw={'hspace': 0},
-            figsize=(6*nC,5*nC))
+        if figsize==None: figsize = (6*nC,4*nC)
+        fig, axs = plt.subplots(2, sharex=False, sharey=False,
+            gridspec_kw={'hspace': 0.1},
+            figsize=figsize)
     else: # G-A plot
+        if figsize==None: figsize = (8*nC,3*nC)
         fig, axs = plt.subplots(1,2, sharex=True, sharey=False,
-            figsize=(8*nC,3*nC))
+            figsize=figsize)
 
     # Swarmplot
-    swarmplot(df, indeces, axs[0], spread=spread, trend=trend,
-              operation=operation, swarmPlot_kw=swarmPlot_kw,
+    swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend,
+              operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
               color_palette=color_palette)
     
     # Distribution plot
