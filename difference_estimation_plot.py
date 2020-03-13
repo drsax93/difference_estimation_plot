@@ -11,19 +11,27 @@ import seaborn as sns
 # SWARMPLOT
 
 def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
-              SWARM = 1, swarmPlot_kw=None, trendPlot_kw=None,
+              paired=False, SWARM = 1, swarmPlot_kw={}, trendPlot_kw={},
               color_palette=sns.set_palette('bright',10)):
-    nCols = len(df.columns); ns = len(df) # total number of groups and samples
+    ### PLOTTING STYLE PARAMETERS
+    nCols = 0 # total number of groups and samples
+    for l in indeces: nCols+=len(l)
+    ns = len(df)
+    try: swarmPlot_kw['label'] # swarmplot style
+    except: swarmPlot_kw['label'] = 'Swarm plot'
+    try: swarmPlot_kw['s']
+    except: swarmPlot_kw['s'] = 100/np.sqrt(ns)  
+    if trend: # trend line style
+        try: trendPlot_kw['color']
+        except: trendPlot_kw['color'] = [.5,.5,.5]
+        try: trendPlot_kw['style']
+        except: trendPlot_kw['style'] = '-'
+                
     xticks = []; xlab = []
     x_offset = 0
     for index in indeces: # loop over lists of ggroups (multiple controls)
         nC = len(index)
-        if swarmPlot_kw is None: # swarmplot style
-            swarmPlot_kw = {'label':'Swarm plot', 's':100/np.sqrt(ns)}  
-        if trend: # trend line style
-            if trendPlot_kw is None:
-                trendPlot_kw = {'color':[.5,.5,.5], 'style':'-'}
-
+                
         ym = []; yy = []; xm = []; xx = []
         for n,i in enumerate(index): # loop over groups
             y_ = df[i]; y_ = y_[~np.isnan(y_)] # take nans out
@@ -36,24 +44,23 @@ def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
                 mag_y = np.max(y_) - np.min(y_)
             off_x = mag_y/spread * (np.random.rand(len(y_))-.5) # random scattering amplitudes
             x_ = (x_offset+n) * np.ones(len(y_)) + off_x # x coords for scattering
-            ax.plot(x_, y_, '.', markersize=swarmPlot_kw['s']) # plotting
+            ax.plot(x_, y_, '.', markersize=swarmPlot_kw['s'], color=color_palette[n+x_offset]) # plotting
             xticks.append(x_.mean()); xlab.append(i); ym.append(operation(y_))
             xm.append(x_.mean()); xx.append(x_);  yy.append(y_)
         x_offset+=n+1
-        # plot trend line
-        if trend==1:
-            ax.plot(xm, ym, color=trendPlot_kw['color'],
-                   linestyle=trendPlot_kw['style'])
-        if trend>1: # paired plot
+        
+        if paired: # paired plot
             for n in range(ns):
                 x2p = [xx[i][n] for i in range(nC)]
                 y2p = [yy[i][n] for i in range(nC)]
                 ax.plot(x2p, y2p, color=trendPlot_kw['color'],
                        linestyle=trendPlot_kw['style'])
+        elif trend: # plot trend line
+            ax.plot(xm, ym, color=trendPlot_kw['color'],
+                   linestyle=trendPlot_kw['style'])
     # set axis label and lims
     plt.xticks(xticks, xlab)
     ax.set_ylabel(swarmPlot_kw['label'])
-    ax.set_xlim(-1/spread, nCols-1 +1/spread)
     miny = np.nanmin(df); maxy = np.nanmax(df)
     eps = (maxy - miny)/10
     ax.set_ylim(miny-eps, maxy+eps)
@@ -86,32 +93,56 @@ def confInt(x,interval):
     return mean-CI, mean+CI
 
 def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
-                    nbins=50, ci=.95, spread=5, SMOOTH=[1,1],
-                   bootPlot_kw=None, color_palette=sns.set_palette('bright',10)):
-    if bootPlot_kw is None:
+                    paired=False, nbins=50, ci=.95, spread=5, SMOOTH=[1,3],
+                   bootPlot_kw={}, color_palette=sns.set_palette('bright',10)):
+    ### PLOTTING STYLE PARAMETERS
+    nCols = 0 # total number of groups and samples
+    for l in indeces: nCols+=len(l)
+    ns = len(df)
+    try: bootPlot_kw['label']
+    except:
         if operation==np.mean:
-            bootPlot_kw = {'label':'Mean difference'}
+            bootPlot_kw['label'] = 'Mean difference'
         elif operation==np.median:
-            bootPlot_kw = {'label':'Median difference'}
+            bootPlot_kw['label'] = 'Mean difference'
         else:
-            bootPlot_kw = {'label':'Unknown statistics'}
-    x_offset = 0; nCtot = 0 # x-axis offset for multiple controls; total number of groups
+            bootPlot_kw['label'] = 'Mean difference'
+    try: bootPlot_kw['ci_size']
+    except: bootPlot_kw['ci_size'] = nCols*4 # size of black dot
+    try: bootPlot_kw['ci_width']
+    except: bootPlot_kw['ci_width'] = nCols # width of ci line
+    try: bootPlot_kw['ref_width']
+    except: bootPlot_kw['ref_width'] = nCols/2 # width of ref line
+    try: bootPlot_kw['ref_ls']
+    except: bootPlot_kw['ref_style'] = '--' # style of ref line
+    
+    x_offset = 0;  # x-axis offset for multiple controls
     min_bc = []; max_bc = [] # mins and max values for y axis lims
-
+    m_b = []; ci_b = [] # mean and ci of bootstrapped difference distribution
+    
     for index in indeces: # loop over lists of ggroups (multiple controls)
-        nC = len(index); nCtot+=nC
+        nC = len(index)
         # plot control sample
-        ref =  df[index[0]]; offset = ref.mean()
-        plt.plot(x_offset, 0, 'ko', markersize=10)
-        start = x_offset; fin = x_offset + nC-1 + .5/spread
-        plt.hlines(0, start, fin, linestyle='--')
+        ref =  df[index[0]]
+        if paired: offset = 0
+        else: offset = ref.mean()
+        plt.plot(x_offset, 0, 'ko', markersize=bootPlot_kw['ci_size'])
+        start = x_offset; fin = x_offset + nC-1 + 1/spread
+        plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
+                  linestyle=bootPlot_kw['ref_style'])
         x_offset+=1
-        
+        m_b.append([]); ci_b.append([])
         for n, i in enumerate(index[1:]): # loop over test groups
             y_ = df[i]; y_ = np.asarray(y_[~np.isnan(y_)]) # exclude possible nans if unpaired analysis
-            m_ = bootstrap(y_, nsh=nsh, operation=operation) # perform bootstrap
+            if paired:
+                m_ = bootstrap(y_-ref, nsh=nsh, operation=operation) # paired diff bootstrap
+            else:
+                m_ = bootstrap(y_, nsh=nsh, operation=operation) # bootstrap
             m_h = np.histogram(m_, bins=nbins)
-            m_pdf = m_h[0] / (np.max(m_h[0]) * spread) # obtain normalised dist to fit the swarmplot spread
+            if len(index)>2: # obtain normalised dist to fit the swarmplot spread
+                m_pdf = m_h[0] / (np.max(m_h[0]) * (spread/1.5))
+            else:
+                m_pdf = m_h[0] / (np.max(m_h[0]) * spread)
             m_binCentres = []
             for mn in range(len(m_h[0])): # obtain the centres of the hist bins
                 m_binCentres.append(np.mean([m_h[1][mn+1], m_h[1][mn]]))
@@ -129,9 +160,13 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
     #         CI = confInt(y_, interval=ci)
     #         print(ci_ind,CI, CI_)
             # Plot distribution
-            ax.plot(n+x_offset, m_binCentres.mean()-offset, 'ko', markersize=10) # plot black dot
+            m_b[-1].append(m_binCentres.mean()-offset)
+            ci_b[-1].append([CI_[0]-offset, CI_[1]-offset])
+            ax.plot(n+x_offset, m_binCentres.mean()-offset, 'ko',
+                    markersize=bootPlot_kw['ci_size']) # plot black dot
             ax.fill(m_pdf + n+x_offset, m_binCentres-offset, color=color_palette[n+x_offset]) # plot dist
-            ax.vlines(n+x_offset, CI_[0]-offset, CI_[1]-offset, linewidth=3) # plot CI
+            ax.vlines(n+x_offset, CI_[0]-offset, CI_[1]-offset,
+                      linewidth=bootPlot_kw['ci_width']) # plot CI
         x_offset+=n+1
     # labels and axes lims
     ax.set_ylabel(bootPlot_kw['label'])
@@ -139,20 +174,19 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
     maxy = np.max([0.05, np.max(max_bc)])
     eps = (maxy - miny)/10
     ax.set_ylim(miny-eps, maxy+eps)
-    ax.set_xlim(-1/spread, nCtot-1 + 1/spread)
     sns.despine(ax=ax)
         
-    return ax
+    return ax, m_b, ci_b
 
 
 
 # MAIN FUNCTION THAT PUTS THE TWO TOGETHER
 
-def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
+def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5, paired=False,
                     operation=np.mean, SWARM=1, nsh=5000, ci=.95, nbins=50,
-                    SMOOTH=[1,3], swarmPlot_kw=None, bootPlot_kw=None,
-                    trendPlot_kw=None, color_palette=sns.color_palette('bright',10),
-                    FontScale=2, figsize=None):
+                    SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
+                    trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
+                    FontScale=2, figsize=None, stat=True):
     ''' INPUTS:
     - input_ = dict() containing the samples, indeces are labels
     - indeces = list of indeces used for multiple control analysis;
@@ -164,6 +198,7 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
             if 1 plots the trend line bw mean of samples
             if >1 plots a trend line per sample (MAKE SURE DATA IS PAIRED)
     - spread = control spread of swarmplot and heigght of bootstrapped distribution
+    - paired = set to True if data is paired
     - operation = specify which type of statistic to measure - e.g mean, median, ...
     - SWARM = set to 1 to plot a swarmplot, otherwise scatter uniformly
     - nsh = number of bootstrap samples
@@ -172,8 +207,11 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
     - SMOOTH = list of 2 elements, the first specifys whether to smooth the
             bootstrapped distribution, the second indicates the SD
     - swarmPlot_kw = keywords to modify the style of swarmPlot (to insert more)
+            check individual function for more info
     - bootPlot_kw = keywords to modify the style of difference plot (to insert more)
+            check individual function for more info
     - trendPlot_kw = keywords to modify the style of trend line plot
+            check individual function for more info
     - color_palette = seaborn color_palette or list of colors to use\
     - FontScale = seaborn font_scale parameter
     - figsize = size of the figure to plot as per plt figsize parameter
@@ -186,31 +224,37 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5,
     for i in input_.keys():
         df_.append(pd.DataFrame({i:input_[i]}))
     df = pd.concat(df_, axis=1)
-    cols = df.columns; nC = len(cols)
+    nCols = 0 # total number of groups and samples
+    for l in indeces: nCols+=len(l)
+    ns = len(df)
     
     # Set up the figure
     sns.set(font_scale=FontScale); sns.set_style('ticks')
     if vertical: # Cumming's est plot
-        if figsize==None: figsize = (6*nC,4*nC)
+        if figsize==None: figsize = (6*nCols,4*nCols)
         fig, axs = plt.subplots(2, sharex=False, sharey=False,
             gridspec_kw={'hspace': 0.1},
             figsize=figsize)
     else: # G-A plot
-        if figsize==None: figsize = (8*nC,3*nC)
+        if figsize==None: figsize = (8*nCols,3*nCols)
         fig, axs = plt.subplots(1,2, sharex=True, sharey=False,
             figsize=figsize)
 
     # Swarmplot
-    swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend,
+    swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
               operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
               color_palette=color_palette)
     
     # Distribution plot
-    bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
-                   operation=operation, bootPlot_kw=bootPlot_kw,
-                  color_palette=color_palette)
+    axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
+                                       paired=paired, operation=operation, SMOOTH=SMOOTH,
+                                       bootPlot_kw=bootPlot_kw, color_palette=color_palette)
     
-    return fig,axs
+    xlim = (-1/spread * (nCols/2), nCols-1 + 1/spread * (nCols/2))
+    axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
+    
+    if stat: return fig, axs, m_b, ci_b
+    else: return fig, axs
 
 
     '''
