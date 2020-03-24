@@ -10,7 +10,7 @@ import seaborn as sns
 
 # SWARMPLOT
 
-def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
+def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
               paired=False, SWARM = 1, swarmPlot_kw={}, trendPlot_kw={},
               color_palette=sns.set_palette('bright',10)):
     ### PLOTTING STYLE PARAMETERS
@@ -29,9 +29,8 @@ def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
                 
     xticks = []; xlab = []
     x_offset = 0
-    for index in indeces: # loop over lists of ggroups (multiple controls)
-        nC = len(index)
-                
+    for index in indeces: # loop over lists of groups (multiple controls)
+        nC = len(index)              
         ym = []; yy = []; xm = []; xx = []
         for n,i in enumerate(index): # loop over groups
             y_ = df[i]; y_ = y_[~np.isnan(y_)] # take nans out
@@ -49,7 +48,7 @@ def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
             xm.append(x_.mean()); xx.append(x_);  yy.append(y_)
         x_offset+=n+1
         
-        if paired: # paired plot
+        if paired and trend: # paired plot
             for n in range(ns):
                 x2p = [xx[i][n] for i in range(nC)]
                 y2p = [yy[i][n] for i in range(nC)]
@@ -59,13 +58,14 @@ def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
             ax.plot(xm, ym, color=trendPlot_kw['color'],
                    linestyle=trendPlot_kw['style'])
     # set axis label and lims
-    plt.xticks(xticks, xlab)
+    ax.set_xticks(range(nCols))
+    ax.set_xticklabels(xlab)
     ax.set_ylabel(swarmPlot_kw['label'])
     miny = np.nanmin(df); maxy = np.nanmax(df)
     eps = (maxy - miny)/10
     ax.set_ylim(miny-eps, maxy+eps)
     sns.despine(ax=ax)
-    if vert:
+    if vertical:
         sns.despine(ax=ax, bottom=True)
         ax.set_xticks([])
     
@@ -75,7 +75,7 @@ def swarmplot(df, indeces, ax, vert, spread=5, trend=1, operation=np.mean,
 
 # BOOTSTRAP ESTIMATION PLOT
 
-def bootstrap(x, nsh = 5000, operation=np.mean):
+def bootstrap(x, nsh = 10000, operation=np.mean):
     mean = []
     x_ = x; x_ = x_[~np.isnan(x_)]
     for n in range(nsh):
@@ -92,7 +92,7 @@ def confInt(x,interval):
     CI = ts*SEM # Confidence Intervals
     return mean-CI, mean+CI
 
-def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
+def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                     paired=False, nbins=50, ci=.95, spread=5, SMOOTH=[1,3],
                    bootPlot_kw={}, color_palette=sns.set_palette('bright',10)):
     ### PLOTTING STYLE PARAMETERS
@@ -120,16 +120,21 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
     min_bc = []; max_bc = [] # mins and max values for y axis lims
     m_b = []; ci_b = [] # mean and ci of bootstrapped difference distribution
     
-    for index in indeces: # loop over lists of ggroups (multiple controls)
+    for index in indeces: # loop over lists of groups (multiple controls)
         nC = len(index)
         # plot control sample
         ref =  df[index[0]]
         if paired: offset = 0
         else: offset = ref.mean()
-        plt.plot(x_offset, 0, 'ko', markersize=bootPlot_kw['ci_size'])
-        start = x_offset; fin = x_offset + nC-1 + 1/spread
-        plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
-                  linestyle=bootPlot_kw['ref_style'])
+        if vertical:
+            plt.plot(x_offset, 0, 'ko', markersize=bootPlot_kw['ci_size'])
+            start = x_offset; fin = x_offset + nC-1 + 1.5/spread
+            plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
+                      linestyle=bootPlot_kw['ref_style'])
+        else:
+            start = x_offset; fin = x_offset + nC-1 + 1.5/spread
+            plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
+                      linestyle=bootPlot_kw['ref_style'])
         x_offset+=1
         m_b.append([]); ci_b.append([])
         for n, i in enumerate(index[1:]): # loop over test groups
@@ -162,19 +167,26 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
             # Plot distribution
             m_b[-1].append(m_binCentres.mean()-offset)
             ci_b[-1].append([CI_[0]-offset, CI_[1]-offset])
-            ax.plot(n+x_offset, m_binCentres.mean()-offset, 'ko',
+            ax.plot(n+x_offset, m_.mean()-offset, 'ko',
                     markersize=bootPlot_kw['ci_size']) # plot black dot
             ax.fill(m_pdf + n+x_offset, m_binCentres-offset, color=color_palette[n+x_offset]) # plot dist
             ax.vlines(n+x_offset, CI_[0]-offset, CI_[1]-offset,
                       linewidth=bootPlot_kw['ci_width']) # plot CI
         x_offset+=n+1
     # labels and axes lims
+    ax.set_xticks(range(nC))
+    ax.set_xticklabels(index)
     ax.set_ylabel(bootPlot_kw['label'])
     miny = np.min([-0.05, np.min(min_bc)])
     maxy = np.max([0.05, np.max(max_bc)])
     eps = (maxy - miny)/10
     ax.set_ylim(miny-eps, maxy+eps)
-    sns.despine(ax=ax)
+    if vertical:
+        sns.despine(ax=ax)
+    else:
+        sns.despine(ax=ax, left=True, right=False)
+        ax.yaxis.tick_right()
+        ax.yaxis.set_label_position("right")
         
     return ax, m_b, ci_b
 
@@ -183,7 +195,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=1000,
 # MAIN FUNCTION THAT PUTS THE TWO TOGETHER
 
 def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5, paired=False,
-                    operation=np.mean, SWARM=1, nsh=5000, ci=.95, nbins=50,
+                    operation=np.mean, SWARM=1, nsh=10000, ci=.95, nbins=50,
                     SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
                     trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
                     FontScale=2, figsize=None, stat=True):
@@ -233,12 +245,12 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5, paired=False
     if vertical: # Cumming's est plot
         if figsize==None: figsize = (6*nCols,4*nCols)
         fig, axs = plt.subplots(2, sharex=False, sharey=False,
-            gridspec_kw={'hspace': 0.1},
-            figsize=figsize)
+            gridspec_kw={'hspace': 0.1}, figsize=figsize)
     else: # G-A plot
-        if figsize==None: figsize = (8*nCols,3*nCols)
-        fig, axs = plt.subplots(1,2, sharex=True, sharey=False,
-            figsize=figsize)
+        if figsize==None: figsize = (6*nCols,3*nCols)
+        fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
+              gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
+              figsize=figsize)
 
     # Swarmplot
     swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
@@ -248,10 +260,13 @@ def estimation_plot(input_, indeces, vertical=1, trend=1, spread=5, paired=False
     # Distribution plot
     axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
                                        paired=paired, operation=operation, SMOOTH=SMOOTH,
+                                       vertical=vertical,
                                        bootPlot_kw=bootPlot_kw, color_palette=color_palette)
-    
+    # set common x axis limits
     xlim = (-1/spread * (nCols/2), nCols-1 + 1/spread * (nCols/2))
     axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
+    if not vertical:
+        axs[1].set_xlim(xlim[0]+1, xlim[1])
     
     if stat: return fig, axs, m_b, ci_b
     else: return fig, axs
