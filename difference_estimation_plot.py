@@ -43,7 +43,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
                 mag_y = mag_y/np.max(mag_y)
             else: # scatter
                 mag_y = 1
-            off_x = mag_y/(.3*spread) * (np.random.rand(len(y_))-.5) # random scattering amplitudes
+            off_x = mag_y/(.4*spread) * (np.random.rand(len(y_))-.5) # random scattering amplitudes
             x_ = (x_offset+n) * np.ones(len(y_)) + off_x # x coords for scattering
             ax.plot(x_, y_, '.', markersize=swarmPlot_kw['s'], color=color_palette[n+x_offset]) # plotting
             xticks.append(x_.mean()); xlab.append(i); ym.append(operation(y_))
@@ -131,7 +131,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         if paired: offset = 0
         else: offset = ref.mean()
         plt.plot(x_offset, 0, 'ko', markersize=bootPlot_kw['ci_size'])
-        start = x_offset; fin = x_offset + nC-1 + spread
+        start = x_offset; fin = x_offset + nC-1 + 1/spread
         plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
                   linestyle=bootPlot_kw['ref_style'])
         x_offset+=1
@@ -145,9 +145,9 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             m_h = np.histogram(m_, bins=nbins)
             # obtain normalised dist to fit the swarmplot spread
             if len(index)>2: # if only two groups to be compared
-                m_pdf = m_h[0] / (np.max(m_h[0]) * (spread))
+                m_pdf = m_h[0] / (np.max(m_h[0]) * (1.7*spread))
             else:
-                m_pdf = m_h[0] / (np.max(m_h[0]) * spread)
+                m_pdf = m_h[0] / (np.max(m_h[0]) * (1.*spread))
             m_binCentres = []
             for mn in range(len(m_h[0])): # obtain the centres of the hist bins
                 m_binCentres.append(np.mean([m_h[1][mn+1], m_h[1][mn]]))
@@ -194,7 +194,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
 
 # MAIN FUNCTION THAT PUTS THE TWO TOGETHER
 
-def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=5, paired=False,
+def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paired=False,
                     operation=np.mean, SWARM=1, nsh=10000, ci=.95, nbins=50,
                     SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
                     trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
@@ -206,6 +206,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=5, paire
             in each analysis -
             e.g. list(ind1,ind2) for 2 controls or list(ind) for just one control
     - vertical = if true used a cumming's estimation layout, Gardner-Altman otherwise
+    - EXC = if true display the distribution for the first class and set reference to 0
     - trend = if 0 plots no trend line
             if 1 plots the trend line bw mean of samples
             if >1 plots a trend line per sample (MAKE SURE DATA IS PAIRED)
@@ -243,11 +244,11 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=5, paire
     
     # Set up the figure
     sns.set(font_scale=FontScale); sns.set_style('ticks')
-    if vertical: # Cumming's est plot
+    if vertical: # Cumming's estimation plot
         if figsize==None: figsize = (6*nCols,4*nCols)
         fig, axs = plt.subplots(2, sharex=False, sharey=False,
             gridspec_kw={'hspace': 0.1}, figsize=figsize)
-    elif not vertical and not EXC:
+    elif not vertical and not EXC: # G-A plot
         if figsize==None: figsize = (6*nCols,3*nCols)
         fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
               gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
@@ -276,7 +277,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=5, paire
     if not vertical and not EXC:
         axs[1].set_xlim(xlim[0]+1, xlim[1])
     
-    if stat: return fig, axs, m_b, ci_b
+    if stat: return fig, m_b, ci_b
     else: return fig, axs
 
 
