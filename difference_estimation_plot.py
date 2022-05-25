@@ -17,6 +17,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     nCols = 0 # total number of groups and samples
     for l in indeces: nCols+=len(l)
     ns = len(df)
+    # process keyword args
     try: swarmPlot_kw['label'] # swarmplot style
     except: swarmPlot_kw['label'] = 'Swarm plot'
     try: swarmPlot_kw['s']
@@ -26,7 +27,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     try: swarmPlot_kw['mfc']
     except: swarmPlot_kw['mfc'] = color_palette
     try: swarmPlot_kw['es_width']
-    except: swarmPlot_kw['es_width'] = nCols/2
+    except: swarmPlot_kw['es_width'] = np.log2(nCols)
     try: swarmPlot_kw['alpha']
     except: swarmPlot_kw['alpha'] = .5
     try: swarmPlot_kw['xticks']
@@ -56,7 +57,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
         # loop over groups
         for n,i in enumerate(index):
             y_ = df[i]; y_ = y_[~np.isnan(y_)] # take nans out
-            xlab.append('N=%s'%len(y_))
+            xlab.append('N=%s'%y_.shape[0])
             if SWARM: # swarmplot - obtain envelope of histogram
                 mag_y,_ = np.histogram(y_,bins=10)
                 mag_y = np.interp(np.linspace(0, 10, len(y_)),
@@ -64,7 +65,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
                 mag_y = mag_y / mag_y.max()# / 10 * np.log(len(y_))
             else: # scatter
                 mag_y = 1
-            off_x = mag_y/(.4*spread) * (np.random.rand(len(y_))-.5) # random scattering amplitudes
+            off_x = mag_y/(.6*spread) * (np.random.rand(len(y_))-.5) # random scattering amplitudes
             # plot
             x_ = (x_offset+n+.1) * np.ones(len(y_)) + off_x # x coords for scattering
             xticks.append(np.mean(x_))
@@ -115,7 +116,6 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     if vertical:
         sns.despine(ax=ax, bottom=True)
         if not swarmPlot_kw['xticks']: ax.set_xticks([])
-    
     return ax
 
 
@@ -189,7 +189,7 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
     return nvals
 
 def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
-                    paired=False, nbins=50, ci=.95, spread=5, SMOOTH=[1,3],
+                    paired=False, BCA=False, nbins=100, ci=.95, spread=5, SMOOTH=[1,3],
                    bootPlot_kw={}, color_palette=sns.set_palette('bright',10)):
     ### PLOTTING STYLE PARAMETERS
     nCols = 0 # total number of groups and samples
@@ -198,18 +198,19 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         nCols+=len(l)
         col_ids.extend(l)
     ns = len(df)
+    # process keyword args
     try: bootPlot_kw['label']
     except:
         if operation==np.mean:
-            bootPlot_kw['label'] = 'Mean difference'
+            bootPlot_kw['label'] = 'Mean $\Delta$'
         elif operation==np.median:
-            bootPlot_kw['label'] = 'Median difference'
+            bootPlot_kw['label'] = 'Median $\Delta$'
         else:
             bootPlot_kw['label'] = 'Other difference'
     try: bootPlot_kw['ci_size']
-    except: bootPlot_kw['ci_size'] = nCols*3  # size of black dot
+    except: bootPlot_kw['ci_size'] = nCols*1.5  # size of black dot
     try: bootPlot_kw['ci_width']
-    except: bootPlot_kw['ci_width'] = nCols # width of ci line
+    except: bootPlot_kw['ci_width'] = nCols/2 # width of ci line
     try: bootPlot_kw['ref_width']
     except: bootPlot_kw['ref_width'] = nCols/2 # width of ref line
     try: bootPlot_kw['ref_ls']
@@ -233,8 +234,6 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         else: offset = m_ref.mean()
         # obtain stats for ref distribution
         xticks.append(x_offset+.1)
-        ref = np.asarray(ref[~np.isnan(ref)])
-        m_ref = bootstrap(ref, nsh=nsh, operation=operation) # bootstrap
         plt.plot(x_offset+.1, 0, 'ko', markersize=bootPlot_kw['ci_size'])
         start = x_offset+.1; fin = x_offset + nC-1 + 1/spread
         plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
@@ -248,27 +247,28 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             else:
                 m_ = bootstrap(y_, nsh=nsh, operation=operation) # bootstrap
             m_h = np.histogram(m_, bins=nbins)
-            # obtain normalised dist to fit the swarmplot spread
-            if len(index)>2: # if only two groups to be compared
-                m_pdf = m_h[0] / (np.max(m_h[0]) * (1.4*spread))
-            else:
-                m_pdf = m_h[0] / (np.max(m_h[0]) * (.8*spread))
+            # obtain the centres of the hist bins
             m_binCentres = []
-            for mn in range(len(m_h[0])): # obtain the centres of the hist bins
+            for mn in range(len(m_h[0])): 
                 m_binCentres.append(np.mean([m_h[1][mn+1], m_h[1][mn]]))
             m_binCentres = np.asarray(m_binCentres)
             min_bc.append(np.min(m_binCentres)-offset)
             max_bc.append(np.max(m_binCentres)-offset)
             if SMOOTH[0]: # smooth dist wit gaussian
-                m_pdf = gaussian_filter1d(m_pdf, SMOOTH[1])
+                m_h = gaussian_filter1d(m_h[0], SMOOTH[1])
+            # obtain normalised dist to fit the swarmplot spread
+            if len(index)>2: # if only two groups to be compared
+                m_pdf = m_h / (np.max(m_h) * (1.2*spread))
+            else:
+                m_pdf = m_h / (np.max(m_h) * (.9*spread))
             m_pdf[0] = 0; m_pdf[-1] = 0 # make sure distribution touches CI line
             # find confident interval - take samples from sorted dist
             ci_ind = np.round((nsh - nsh*ci)/2).astype(int)
             m_sort = np.sort(m_)
-            CI_ = [m_sort[ci_ind],m_sort[-ci_ind]]
+            CI = np.array([m_sort[ci_ind],m_sort[-ci_ind]]) - offset
             # obtain bias corrected estimate
-            if not paired:
-                bootdiff = m_- m_ref
+            if not paired and BCA:
+                bootdiff = m_ - m_ref
                 tdata = (bootdiff, )
                 bootsort = bootdiff.copy()
                 bootsort.sort()
@@ -276,11 +276,21 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                 bca_ind = bca(tdata, alphas, bootsort,
                            operation, summ_stat, nsh)
                 CI_ = bootsort[bca_ind]
+                ci_ratio = np.abs(np.diff(CI_)) / np.abs(np.diff(CI))
+                if ci_ratio==0: # bca correction failed
+                    CI_ = CI
+                    ci_ratio = 1
+            else:
+                CI_ = CI
+                ci_ratio = 1
             # Plot distribution
-            m_b[-1].append(m_binCentres.mean()-offset)
-            ci_b[-1].append([CI_[0]-offset, CI_[1]-offset])
+            m_binCentres = (m_binCentres - m_binCentres.mean()) *\
+                             np.sqrt(ci_ratio) + m_binCentres.mean()
+            # m_pdf = m_pdf * np.sqrt(ci_ratio)
+            m_b[-1].append(m_.mean()-offset)
+            ci_b[-1].append([CI_[0], CI_[1]])
             xticks.append(n+x_offset+.1)
-            ax.plot(n+x_offset+.1, m_.mean()-offset, 'ko',
+            ax.plot(n+x_offset+.1, m_b[-1][-1], 'ko',
                     markersize=bootPlot_kw['ci_size']) # plot black dot
             ax.fill(m_pdf + n+x_offset+.1, m_binCentres-offset, color=color_palette[n+x_ind]) # plot dist
             ax.vlines(n+x_offset+.1, CI_[0], CI_[1], color='k',
@@ -311,7 +321,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
 # MAIN FUNCTION THAT PUTS THE TWO TOGETHER
 
 def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paired=False,
-                    operation=np.mean, SWARM=1, nsh=10000, ci=.95, nbins=50,
+                    operation=np.mean, SWARM=1, nsh=10000, ci=.95, nbins=100, BCA=True,
                     SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
                     trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
                     FontScale=1, figsize=None, stat=True):
@@ -326,13 +336,14 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     - trend = if 0 plots no trend line
             if 1 plots the trend line bw mean of samples
             if >1 plots a trend line per sample (MAKE SURE DATA IS PAIRED)
-    - spread = control spread of swarmplot and heigght of bootstrapped distribution
+    - spread = control spread of swarmplot and height of bootstrapped distribution
     - paired = set to True if data is paired
     - operation = specify which type of statistic to measure - e.g mean, median, ...
     - SWARM = set to 1 to plot a swarmplot, otherwise scatter uniformly
     - nsh = number of bootstrap samples
     - ci = confidence interval as ratio - e.g. .95
     - nbins = number of bins to estimate bootsrap distribution
+    - BCA = use BCa correction 
     - SMOOTH = list of 2 elements, the first specifys whether to smooth the
             bootstrapped distribution, the second indicates the SD
     - swarmPlot_kw = keywords to modify the style of swarmPlot (to insert more)
@@ -346,8 +357,43 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     - figsize = size of the figure to plot as per plt figsize parameter
     - stat = set to False not to have mean and ci of the bootstrap distributions returned
 
+    Swarmplot keyword args:
+        try: swarmPlot_kw['label'] # swarmplot style
+        except: swarmPlot_kw['label'] = 'Swarm plot'
+        try: swarmPlot_kw['s']
+        except: swarmPlot_kw['s'] = 30/np.log2(ns)
+        try: swarmPlot_kw['m']
+        except: swarmPlot_kw['m'] = '.'
+        try: swarmPlot_kw['mfc']
+        except: swarmPlot_kw['mfc'] = color_palette
+        try: swarmPlot_kw['es_width']
+        except: swarmPlot_kw['es_width'] = nCols/2
+        try: swarmPlot_kw['alpha']
+        except: swarmPlot_kw['alpha'] = .5
+        try: swarmPlot_kw['xticks']
+        except: swarmPlot_kw['xticks'] = True
+    
+    Trendplot keyword arguments:
+        try: trendPlot_kw['color']
+        except: trendPlot_kw['color'] = [.5,.5,.5]
+        try: trendPlot_kw['style']
+        except: trendPlot_kw['style'] = '-'
+        try: trendPlot_kw['alpha']
+        except: trendPlot_kw['alpha'] = .5
+
+    Bootplot keyword args:
+        try: bootPlot_kw['ci_size']
+        except: bootPlot_kw['ci_size'] = nCols*1.5  # size of black dot
+        try: bootPlot_kw['ci_width']
+        except: bootPlot_kw['ci_width'] = nCols/2 # width of ci line
+        try: bootPlot_kw['ref_width']
+        except: bootPlot_kw['ref_width'] = nCols/2 # width of ref line
+        try: bootPlot_kw['ref_ls']
+        except: bootPlot_kw['ref_style'] = '--' # style of ref line
+
+
     OUTPUTS:
-    fig, axs, mi, ci = figure, 2 axes handles and optionally mean and conf interval of bootstrap
+    fig, mi, ci = figure object and optionally mean and conf interval of bootstrap
     '''
 
     df_ = []
@@ -361,34 +407,34 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     # Set up the figure
     sns.set(font_scale=FontScale); sns.set_style('ticks')
     if vertical: # Cumming's estimation plot
-        if figsize==None: figsize = (3*nCols,7)
+        if figsize==None: figsize = (1*nCols,4)
         fig, axs = plt.subplots(2, sharex=False, sharey=False,
             gridspec_kw={'hspace': 0.1}, figsize=figsize)
     elif not vertical and not EXC: # G-A plot
-        if figsize==None: figsize = (6,6)
+        if figsize==None: figsize = (4,5)
         fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
               gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
               figsize=figsize)
     else: # G-A plot w exception
-        if figsize==None: figsize = (6,4)
+        if figsize==None: figsize = (5,4)
         fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
               gridspec_kw={'wspace': 0.1}, figsize=figsize)
-
+    
+    # Distribution plot
+    axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
+                                       paired=paired, operation=operation, SMOOTH=SMOOTH,
+                                       vertical=vertical, BCA=BCA,
+                                       bootPlot_kw=bootPlot_kw, color_palette=color_palette)
     # Swarmplot
     swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
               operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
               color_palette=color_palette)
     
-    # Distribution plot
-    axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
-                                       paired=paired, operation=operation, SMOOTH=SMOOTH,
-                                       vertical=vertical,
-                                       bootPlot_kw=bootPlot_kw, color_palette=color_palette)
     # set common x axis limits
     if nCols==2:
-        xlim = (-1/spread * (nCols), nCols-1 + 1/spread * 1.1*(nCols))
+        xlim = (-1/spread * (nCols), nCols-1 + 1.1/spread * 1.1*(nCols))
     else:
-        xlim = (-.7/spread * (nCols/2), nCols-1 + 1/spread * 1.1*(nCols/2))
+        xlim = (-.7/spread * (nCols/2), nCols-1 + 1.1/spread * 1.1*(nCols/2))
     axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
     if not vertical and not EXC:
         axs[1].set_xlim(xlim[0]+1, xlim[1])
