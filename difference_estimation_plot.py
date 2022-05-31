@@ -286,7 +286,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                 ci_ratio = 1
             # Plot distribution
             m_binCentres = (m_binCentres - m_binCentres.mean()) *\
-                             np.sqrt(ci_ratio) + m_binCentres.mean()
+                             np.sqrt(ci_ratio) + m_binCentres.mean() # scale wrt bca
             # m_pdf = m_pdf * np.sqrt(ci_ratio)
             m_b[-1].append(m_.mean()-offset)
             ci_b[-1].append([CI_[0], CI_[1]])
@@ -455,7 +455,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(90) + 0.4,
          'sample 3': np.random.rand(200) - 0.2}
     KEYS = list(input_.keys())
-    fig,axs,m,ci = dpl.estimation_plot(input_, [KEYS])
+    axs,m,ci = dpl.estimation_plot(input_, [KEYS])
 
     - No stats returned:
     
@@ -463,7 +463,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(90) + 0.4,
          'sample 3': np.random.rand(200) - 0.2}
     KEYS = list(input_.keys())
-    fig,axs,m,ci = dpl.estimation_plot(input_, [KEYS], stat=False)
+    axs,m,ci = dpl.estimation_plot(input_, [KEYS], stat=False)
 
     - Paired example:
 
@@ -471,7 +471,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(100) + 0.4,
          'sample 3': np.random.rand(100) - 0.2}
     KEYS = list(input_.keys())
-    fig,axs,m,ci = dpl.estimation_plot(input_, [KEYS], trend=1, paired=True)
+    axs,m,ci = dpl.estimation_plot(input_, [KEYS], trend=1, paired=True)
 
     - Median difference example:
 
@@ -479,12 +479,35 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(100) + 0.4,
          'sample 3': np.random.rand(100) - 0.2}
     KEYS = list(input_.keys())
-    fig,axs,m,ci = dpl.estimation_plot(input_, [KEYS], trend=1, operation=np.median)
+    axs,m,ci = dpl.estimation_plot(input_, [KEYS], trend=1, operation=np.median)
     
     - Multiple controls
     input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(100) + 0.4,
              'sample 3': np.random.rand(100) - 0.2, 'sample 4': np.random.rand(100) - 0.1}
     KEYS = list(input_.keys())
-    fig,axs,m,ci = dpl.estimation_plot(input_, [KEYS[:2], KEYS[2:]], trend=1)
+    axs,m,ci = dpl.estimation_plot(input_, [KEYS[:2], KEYS[2:]], trend=1)
+
+
+    - Nested subplots example
+     input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(100) + 0.4,
+             'sample 3': np.random.rand(100) - 0.2, 'sample 4': np.random.rand(100) - 0.1}
+     KEYS = list(input_.keys())
+     # set common figure
+    fig = plt.figure(figsize=(8,4))
+    gs0 = gridspec.GridSpec(1, 2, figure=fig, hspace=.3)
+
+    # create nested subplots 1
+    gs00 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[0])
+    ax1 = fig.add_subplot(gs00[0, :])
+    ax2 = fig.add_subplot(gs00[1, :])
+    axs = [ax1,ax2]
+    axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs)
+
+    # create nested subplots 2
+    gs00 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[1])
+    ax1 = fig.add_subplot(gs00[0, :])
+    ax2 = fig.add_subplot(gs00[1, :])
+    axs = [ax1,ax2]
+    axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs)
 
     '''
