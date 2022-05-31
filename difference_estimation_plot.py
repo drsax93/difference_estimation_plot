@@ -4,6 +4,7 @@ import pandas as pd # data manipulation and analysis
 from scipy import stats
 from scipy.ndimage.filters import gaussian_filter1d
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import seaborn as sns 
 
 
@@ -122,7 +123,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
 
 # BOOTSTRAP ESTIMATION PLOT
 
-def bootstrap(x, nsh = 10000, operation=np.mean):
+def bootstrap(x, nsh=10000, operation=np.mean):
     mean = []
     x_ = x; x_ = x_[~np.isnan(x_)]
     for n in range(nsh):
@@ -189,7 +190,7 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
     return nvals
 
 def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
-                    paired=False, BCA=False, nbins=100, ci=.95, spread=5, SMOOTH=[1,3],
+                    paired=False, BCA=True, nbins=100, ci=.95, spread=5, SMOOTH=[1,3],
                    bootPlot_kw={}, color_palette=sns.set_palette('bright',10)):
     ### PLOTTING STYLE PARAMETERS
     nCols = 0 # total number of groups and samples
@@ -324,7 +325,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
                     operation=np.mean, SWARM=1, nsh=10000, ci=.95, nbins=100, BCA=True,
                     SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
                     trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
-                    FontScale=1, figsize=None, stat=True):
+                    FontScale=1, axs=None, figsize=None, stat=True):
     ''' INPUTS:
     - input_ = dict() containing the samples, indeces are labels
     - indeces = list of indeces used for multiple control analysis;
@@ -406,21 +407,23 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     
     # Set up the figure
     sns.set(font_scale=FontScale); sns.set_style('ticks')
-    if vertical: # Cumming's estimation plot
-        if figsize==None: figsize = (1*nCols,4)
-        fig, axs = plt.subplots(2, sharex=False, sharey=False,
-            gridspec_kw={'hspace': 0.1}, figsize=figsize)
-    elif not vertical and not EXC: # G-A plot
-        if figsize==None: figsize = (4,5)
-        fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
-              gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
-              figsize=figsize)
-    else: # G-A plot w exception
-        if figsize==None: figsize = (5,4)
-        fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
+    if not axs:
+        if vertical: # Cumming's estimation plot
+            if figsize==None: figsize = (1*nCols,4)
+            fig, axs = plt.subplots(2,1, sharex=False, sharey=False,
               gridspec_kw={'wspace': 0.1}, figsize=figsize)
+        elif not vertical and not EXC: # G-A plot
+            if figsize==None: figsize = (4,5)
+            fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
+                  gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
+                  figsize=figsize)
+        else: # G-A plot w exception
+            if figsize==None: figsize = (5,4)
+            fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
+                  gridspec_kw={'wspace': 0.1}, figsize=figsize)
     
     # Distribution plot
+
     axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
                                        paired=paired, operation=operation, SMOOTH=SMOOTH,
                                        vertical=vertical, BCA=BCA,
@@ -439,8 +442,8 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     if not vertical and not EXC:
         axs[1].set_xlim(xlim[0]+1, xlim[1])
     
-    if stat: return fig, m_b, ci_b
-    else: return fig
+    if stat: return axs, m_b, ci_b
+    else: return axs
 
 
     '''
