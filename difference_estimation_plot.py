@@ -8,6 +8,29 @@ import matplotlib.gridspec as gridspec
 import seaborn as sns 
 
 
+# NESTED SUBPLOTS
+
+def nested_subplots(fig=None, r1=(1,2), r2=(2,1), hspace=.2):
+    # input fig if an existing figure is to be used
+    # r1 is the ratio for the first subplot
+    #r2 is the ratio for the second subplot
+    # set common figure - first subplot frame
+    if not fig: fig = plt.figure(figsize=(8,4))
+    gs0 = gridspec.GridSpec(r1[0], r1[1], figure=fig, hspace=hspace)
+    axs = []
+    # create nested subplots 1
+    gs00 = gridspec.GridSpecFromSubplotSpec(r2[0], r2[1], subplot_spec=gs0[0])
+    ax1 = fig.add_subplot(gs00[0, :])
+    ax2 = fig.add_subplot(gs00[1, :])
+    axs.append([ax1,ax2])
+    # create nested subplots 1
+    gs00 = gridspec.GridSpecFromSubplotSpec(r2[0], r2[1], subplot_spec=gs0[0])
+    ax1 = fig.add_subplot(gs00[0, :])
+    ax2 = fig.add_subplot(gs00[1, :])
+    axs.append([ax1,ax2])
+    # return 2 pairs of axes
+    return axs
+
 
 # SWARMPLOT
 
@@ -492,22 +515,11 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
      input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(100) + 0.4,
              'sample 3': np.random.rand(100) - 0.2, 'sample 4': np.random.rand(100) - 0.1}
      KEYS = list(input_.keys())
-     # set common figure
-    fig = plt.figure(figsize=(8,4))
-    gs0 = gridspec.GridSpec(1, 2, figure=fig, hspace=.3)
-
-    # create nested subplots 1
-    gs00 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[0])
-    ax1 = fig.add_subplot(gs00[0, :])
-    ax2 = fig.add_subplot(gs00[1, :])
-    axs = [ax1,ax2]
-    axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs)
-
-    # create nested subplots 2
-    gs00 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[1])
-    ax1 = fig.add_subplot(gs00[0, :])
-    ax2 = fig.add_subplot(gs00[1, :])
-    axs = [ax1,ax2]
-    axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs)
+     # obtain nested axes
+     axs_nested = nested_subplots()
+     # first estimation plot
+     axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs_nested[0])
+     # second estimation plot
+     axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs_nested[1])
 
     '''
