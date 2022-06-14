@@ -10,24 +10,20 @@ import seaborn as sns
 
 # NESTED SUBPLOTS
 
-def nested_subplots(fig=None, r1=(1,2), r2=(2,1), hspace=.2):
+def nested_subplots(fig=None, r1=(1,2), r2=(2,1), hspace=.2, wspace=.2):
     # input fig if an existing figure is to be used
     # r1 is the ratio for the first subplot
-    #r2 is the ratio for the second subplot
+    # r2 is the ratio for the second subplot
     # set common figure - first subplot frame
     if not fig: fig = plt.figure(figsize=(8,4))
-    gs0 = gridspec.GridSpec(r1[0], r1[1], figure=fig, hspace=hspace)
+    gs0 = gridspec.GridSpec(r1[0], r1[1], figure=fig, hspace=hspace, wspace=wspace)
     axs = []
-    # create nested subplots 1
-    gs00 = gridspec.GridSpecFromSubplotSpec(r2[0], r2[1], subplot_spec=gs0[0])
-    ax1 = fig.add_subplot(gs00[0, :])
-    ax2 = fig.add_subplot(gs00[1, :])
-    axs.append([ax1,ax2])
-    # create nested subplots 1
-    gs00 = gridspec.GridSpecFromSubplotSpec(r2[0], r2[1], subplot_spec=gs0[0])
-    ax1 = fig.add_subplot(gs00[0, :])
-    ax2 = fig.add_subplot(gs00[1, :])
-    axs.append([ax1,ax2])
+    for gsi in gs0:
+        # create nested subplots 1
+        gs00 = gridspec.GridSpecFromSubplotSpec(r2[0], r2[1], subplot_spec=gsi)
+        ax1 = fig.add_subplot(gs00[0, :])
+        ax2 = fig.add_subplot(gs00[1, :])
+        axs.append([ax1,ax2])
     # return 2 pairs of axes
     return axs
 
@@ -223,20 +219,18 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         col_ids.extend(l)
     ns = len(df)
     # process keyword args
-    try: bootPlot_kw['label']
-    except:
-        if operation==np.mean:
-            bootPlot_kw['label'] = 'Mean $\Delta$'
-        elif operation==np.median:
-            bootPlot_kw['label'] = 'Median $\Delta$'
-        else:
-            bootPlot_kw['label'] = 'Other difference'
+    if operation==np.mean:
+        bootPlot_kw['label'] = 'Mean $\Delta$'
+    elif operation==np.median:
+        bootPlot_kw['label'] = 'Median $\Delta$'
+    else:
+        bootPlot_kw['label'] = 'Other difference'
     try: bootPlot_kw['ci_size']
-    except: bootPlot_kw['ci_size'] = nCols*1.5  # size of black dot
+    except: bootPlot_kw['ci_size'] = 4  # size of black dot
     try: bootPlot_kw['ci_width']
-    except: bootPlot_kw['ci_width'] = nCols/2 # width of ci line
+    except: bootPlot_kw['ci_width'] = 2 # width of ci line
     try: bootPlot_kw['ref_width']
-    except: bootPlot_kw['ref_width'] = nCols/2 # width of ref line
+    except: bootPlot_kw['ref_width'] = 2 # width of ref line
     try: bootPlot_kw['ref_ls']
     except: bootPlot_kw['ref_style'] = '--' # style of ref line
     
@@ -258,9 +252,9 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         else: offset = m_ref.mean()
         # obtain stats for ref distribution
         xticks.append(x_offset+.1)
-        plt.plot(x_offset+.1, 0, 'ko', markersize=bootPlot_kw['ci_size'])
+        ax.plot(x_offset+.1, 0, 'ko', markersize=bootPlot_kw['ci_size'])
         start = x_offset+.1; fin = x_offset + nC-1 + 1/spread
-        plt.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
+        ax.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
                   linestyle=bootPlot_kw['ref_style'], color='k')
         x_offset+=1
         m_b.append([]); ci_b.append([])
@@ -345,7 +339,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
 # MAIN FUNCTION THAT PUTS THE TWO TOGETHER
 
 def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paired=False,
-                    operation=np.mean, SWARM=1, nsh=10000, ci=.95, nbins=100, BCA=True,
+                    operation=np.mean, SWARM=1, nsh=5000, ci=.95, nbins=100, BCA=True,
                     SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
                     trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
                     FontScale=1, axs=None, figsize=None, stat=True):
@@ -449,10 +443,10 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
 
     axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
                                        paired=paired, operation=operation, SMOOTH=SMOOTH,
-                                       vertical=vertical, BCA=BCA,
+                                       vertical=vertical, BCA=BCA, nsh=nsh,
                                        bootPlot_kw=bootPlot_kw, color_palette=color_palette)
     # Swarmplot
-    swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
+    axs[0] = swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
               operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
               color_palette=color_palette)
     
@@ -460,7 +454,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     if nCols==2:
         xlim = (-1/spread * (nCols), nCols-1 + 1.1/spread * 1.1*(nCols))
     else:
-        xlim = (-.7/spread * (nCols/2), nCols-1 + 1.1/spread * 1.1*(nCols/2))
+        xlim = (-.2/spread * (nCols/2), nCols-1 + 1.1/spread * 1.1*(nCols/2))
     axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
     if not vertical and not EXC:
         axs[1].set_xlim(xlim[0]+1, xlim[1])
@@ -516,7 +510,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
              'sample 3': np.random.rand(100) - 0.2, 'sample 4': np.random.rand(100) - 0.1}
      KEYS = list(input_.keys())
      # obtain nested axes
-     axs_nested = nested_subplots()
+     axs_nested = dpl.nested_subplots()
      # first estimation plot
      axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs_nested[0])
      # second estimation plot
