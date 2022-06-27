@@ -210,7 +210,7 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
 
 def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                     paired=False, BCA=True, nbins=100, ci=.95, spread=5, SMOOTH=[1,3],
-                   bootPlot_kw={}, color_palette=sns.set_palette('bright',10)):
+                   bootPlot_kw={}, color_palette=sns.set_palette('bright',10), lbl_rot=0):
     ### PLOTTING STYLE PARAMETERS
     nCols = 0 # total number of groups and samples
     col_ids = []
@@ -319,7 +319,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         except: x_offset+=1.1; x_ind+=1
     # labels and axes lims
     ax.set_xticks(xticks)
-    ax.set_xticklabels(col_ids)
+    ax.set_xticklabels(col_ids, rotation=lbl_rot)
     ax.set_ylabel(bootPlot_kw['label'])
     miny = np.min([-0.005, np.min(min_bc)])
     maxy = np.max([0.005, np.max(max_bc)])
@@ -340,7 +340,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
 
 def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paired=False,
                     operation=np.mean, SWARM=1, nsh=5000, ci=.95, nbins=100, BCA=True,
-                    SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={},
+                    SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={}, lbl_rot=0,
                     trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
                     FontScale=1, axs=None, figsize=None, stat=True):
     ''' INPUTS:
@@ -370,7 +370,8 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
             check individual function for more info
     - trendPlot_kw = keywords to modify the style of trend line plot
             check individual function for more info
-    - color_palette = seaborn color_palette or list of colors to use\
+    - lbl_rot = rotation param for x axis labels
+    - color_palette = seaborn color_palette or list of colors to use
     - FontScale = seaborn font_scale parameter
     - figsize = size of the figure to plot as per plt figsize parameter
     - stat = set to False not to have mean and ci of the bootstrap distributions returned
@@ -443,7 +444,7 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
 
     axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
                                        paired=paired, operation=operation, SMOOTH=SMOOTH,
-                                       vertical=vertical, BCA=BCA, nsh=nsh,
+                                       vertical=vertical, BCA=BCA, nsh=nsh, lbl_rot=lbl_rot,
                                        bootPlot_kw=bootPlot_kw, color_palette=color_palette)
     # Swarmplot
     axs[0] = swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
