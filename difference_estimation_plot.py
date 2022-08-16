@@ -32,7 +32,7 @@ def nested_subplots(fig=None, r1=(1,2), r2=(2,1), hspace=.2, wspace=.2):
 
 def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
               paired=False, SWARM=1, swarmPlot_kw={}, trendPlot_kw={},
-              color_palette=sns.set_palette('bright',10)):
+              color_palette=sns.set_palette('bright',100)):
     ### PLOTTING STYLE PARAMETERS
     nCols = 0 # total number of groups and samples
     for l in indeces: nCols+=len(l)
@@ -46,8 +46,8 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     except: swarmPlot_kw['m'] = '.'
     try: swarmPlot_kw['mfc']
     except: swarmPlot_kw['mfc'] = color_palette
-    try: swarmPlot_kw['es_width']
-    except: swarmPlot_kw['es_width'] = np.log2(nCols)
+    try: swarmPlot_kw['err_width']
+    except: swarmPlot_kw['err_width'] = np.log2(nCols)
     try: swarmPlot_kw['alpha']
     except: swarmPlot_kw['alpha'] = .5
     try: swarmPlot_kw['xticks']
@@ -107,7 +107,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
                           [np.mean(y_)-np.std(y_), np.mean(y_)+off_center],
                           [np.mean(y_)-off_center, np.mean(y_)+np.std(y_)],
                          color=color_palette[n+x_ind],
-                         linewidth=swarmPlot_kw['es_width'])
+                         linewidth=swarmPlot_kw['err_width'])
             # store variables for trend plot
             ym.append(operation(y_)); xm.append(x_.mean())
             xx.append(x_);  yy.append(y_)
@@ -210,7 +210,7 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
 
 def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                     paired=False, BCA=True, nbins=100, ci=.95, spread=5, SMOOTH=[1,3],
-                   bootPlot_kw={}, color_palette=sns.set_palette('bright',10), lbl_rot=0):
+                   bootPlot_kw={}, color_palette=sns.set_palette('bright',100), lbl_rot=0):
     ### PLOTTING STYLE PARAMETERS
     nCols = 0 # total number of groups and samples
     col_ids = []
@@ -341,7 +341,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
 def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paired=False,
                     operation=np.mean, SWARM=1, nsh=5000, ci=.95, nbins=100, BCA=True,
                     SMOOTH=[1,3], swarmPlot_kw={}, bootPlot_kw={}, lbl_rot=0,
-                    trendPlot_kw={}, color_palette=sns.color_palette('bright',10),
+                    trendPlot_kw={}, color_palette=sns.color_palette('bright',100),
                     FontScale=1, axs=None, figsize=None, stat=True):
     ''' INPUTS:
     - input_ = dict() containing the samples, indeces are labels
@@ -385,8 +385,8 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
         except: swarmPlot_kw['m'] = '.'
         try: swarmPlot_kw['mfc']
         except: swarmPlot_kw['mfc'] = color_palette
-        try: swarmPlot_kw['es_width']
-        except: swarmPlot_kw['es_width'] = nCols/2
+        try: swarmPlot_kw['err_width']
+        except: swarmPlot_kw['err_width'] = nCols/2
         try: swarmPlot_kw['alpha']
         except: swarmPlot_kw['alpha'] = .5
         try: swarmPlot_kw['xticks']
