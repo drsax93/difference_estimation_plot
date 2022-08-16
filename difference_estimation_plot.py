@@ -47,7 +47,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     try: swarmPlot_kw['mfc']
     except: swarmPlot_kw['mfc'] = color_palette
     try: swarmPlot_kw['err_width']
-    except: swarmPlot_kw['err_width'] = np.log2(nCols)
+    except: swarmPlot_kw['err_width'] = 2
     try: swarmPlot_kw['alpha']
     except: swarmPlot_kw['alpha'] = .5
     try: swarmPlot_kw['xticks']
