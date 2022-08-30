@@ -410,63 +410,14 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
         try: bootPlot_kw['ref_ls']
         except: bootPlot_kw['ref_style'] = '--' # style of ref line
 
-
+    ------------
+    
     OUTPUTS:
     fig, mi, ci = figure object and optionally mean and conf interval of bootstrap
-    '''
-
-    df_ = []
-    for i in input_.keys():
-        df_.append(pd.DataFrame({i:input_[i]}))
-    df = pd.concat(df_, axis=1)
-    nCols = 0 # total number of groups and samples
-    for l in indeces: nCols+=len(l)
-    ns = len(df)
     
-    # Set up the figure
-    sns.set(font_scale=FontScale); sns.set_style('ticks')
-    if not axs:
-        if vertical: # Cumming's estimation plot
-            if figsize==None: figsize = (1*nCols,4)
-            fig, axs = plt.subplots(2,1, sharex=False, sharey=False,
-              gridspec_kw={'wspace': 0.1}, figsize=figsize)
-        elif not vertical and not EXC: # G-A plot
-            if figsize==None: figsize = (4,5)
-            fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
-                  gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
-                  figsize=figsize)
-        else: # G-A plot w exception
-            if figsize==None: figsize = (5,4)
-            fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
-                  gridspec_kw={'wspace': 0.1}, figsize=figsize)
+    ------------
     
-    # Distribution plot
-
-    axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
-                                       paired=paired, operation=operation, SMOOTH=SMOOTH,
-                                       vertical=vertical, BCA=BCA, nsh=nsh, lbl_rot=lbl_rot,
-                                       bootPlot_kw=bootPlot_kw, color_palette=color_palette)
-    # Swarmplot
-    axs[0] = swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
-              operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
-              color_palette=color_palette)
-    
-    # set common x axis limits
-    if nCols==2:
-        xlim = (-1/spread * (nCols), nCols-1 + 1.1/spread * 1.1*(nCols))
-    else:
-        xlim = (-.2/spread * (nCols/2), nCols-1 + 1.1/spread * 1.1*(nCols/2))
-    axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
-    if not vertical and not EXC:
-        axs[1].set_xlim(xlim[0]+1, xlim[1])
-    
-    if stat: return axs, m_b, ci_b
-    else: return axs
-
-
-    '''
-    EXAMPLE USE:
-    
+    EXAMPLES:
     - Unpaired example:
 
     import difference_estimation_plot as dpl
@@ -506,7 +457,8 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
     axs,m,ci = dpl.estimation_plot(input_, [KEYS[:2], KEYS[2:]], trend=1)
 
 
-    - Nested subplots example
+    - Nested subplots example:
+    
      input_ = {'sample 1': np.random.rand(100), 'sample 2': np.random.rand(100) + 0.4,
              'sample 3': np.random.rand(100) - 0.2, 'sample 4': np.random.rand(100) - 0.1}
      KEYS = list(input_.keys())
@@ -518,3 +470,52 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
      axs, m, ci = dpl.estimation_plot(input_, [KEYS[:2],KEYS[2:]], axs=axs_nested[1])
 
     '''
+
+    # Process input -- convert to dataframe
+    df_ = []
+    for i in input_.keys():
+        df_.append(pd.DataFrame({i:input_[i]}))
+    df = pd.concat(df_, axis=1)
+    nCols = 0 # total number of groups and samples
+    for l in indeces: nCols+=len(l)
+    ns = len(df)
+    
+    # Set up the figure
+    sns.set(font_scale=FontScale); sns.set_style('ticks')
+    if not axs:
+        if vertical: # Cumming's estimation plot
+            if figsize==None: figsize = (1*nCols,4)
+            fig, axs = plt.subplots(2,1, sharex=False, sharey=False,
+              gridspec_kw={'wspace': 0.1}, figsize=figsize)
+        elif not vertical and not EXC: # G-A plot
+            if figsize==None: figsize = (4,5)
+            fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
+                  gridspec_kw={'wspace': 0.1, 'width_ratios': [nCols,nCols-1]},
+                  figsize=figsize)
+        else: # G-A plot w exception
+            if figsize==None: figsize = (5,4)
+            fig, axs = plt.subplots(1,2, sharex=False, sharey=False,
+                  gridspec_kw={'wspace': 0.1}, figsize=figsize)
+    
+    # Swarmplot
+    axs[0] = swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
+              operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
+              color_palette=color_palette)
+    # Distribution plot
+    axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
+                                       paired=paired, operation=operation, SMOOTH=SMOOTH,
+                                       vertical=vertical, BCA=BCA, nsh=nsh, lbl_rot=lbl_rot,
+                                       bootPlot_kw=bootPlot_kw, color_palette=color_palette)
+    
+    # set common x axis limits
+    if nCols==2:
+        xlim = (-1/spread * (nCols), nCols-1 + 1.1/spread * 1.1*(nCols))
+    else:
+        xlim = (-.2/spread * (nCols/2), nCols-1 + 1.1/spread * 1.1*(nCols/2))
+    axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
+    if not vertical and not EXC:
+        axs[1].set_xlim(xlim[0]+1, xlim[1])
+    
+    if stat: return axs, m_b, ci_b
+    else: return axs
+
