@@ -21,16 +21,18 @@ def nested_subplots(fig=None, r1=(1,2), r2=(2,1), hspace=.2, wspace=.2):
     for gsi in gs0:
         # create nested subplots 1
         gs00 = gridspec.GridSpecFromSubplotSpec(r2[0], r2[1], subplot_spec=gsi)
-        ax1 = fig.add_subplot(gs00[0, :])
-        ax2 = fig.add_subplot(gs00[1, :])
-        axs.append([ax1,ax2])
+        axs_ = []
+        for axi,gsii in enumerate(gs00):
+            ax_ = fig.add_subplot(gs00[axi, :])
+            axs_.append(ax_)
+        axs.append(axs_)
     # return 2 pairs of axes
     return axs
 
 
 # SWARMPLOT
 
-def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
+def swarmplot(df, indeces, ax, vertical=1, spread=3, trend=1, operation=np.mean,
               paired=False, SWARM=1, swarmPlot_kw={}, trendPlot_kw={},
               color_palette=sns.set_palette('bright',100)):
     ### PLOTTING STYLE PARAMETERS
@@ -40,8 +42,6 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     # process keyword args
     try: swarmPlot_kw['label'] # swarmplot style
     except: swarmPlot_kw['label'] = 'Swarm plot'
-    try: swarmPlot_kw['s']
-    except: swarmPlot_kw['s'] = 30/np.log2(ns)
     try: swarmPlot_kw['m']
     except: swarmPlot_kw['m'] = '.'
     try: swarmPlot_kw['mfc']
@@ -63,7 +63,8 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
     xticks = []; xlab = []
     x_offset = 0
     x_ind = 0
-    for index in indeces: # loop over lists of groups (multiple controls)
+    # loop over lists of groups (multiple controls)
+    for index in indeces:
         nC = len(index)              
         ym = []; yy = []; xm = []; xx = []
         # marker style option
@@ -77,6 +78,7 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
         # loop over groups
         for n,i in enumerate(index):
             y_ = df[i]; y_ = y_[~np.isnan(y_)] # take nans out
+            if not n and paired: nss = len(y_) # obtain number of ref samples
             xlab.append('N=%s'%y_.shape[0])
             if SWARM: # swarmplot - obtain envelope of histogram
                 mag_y,_ = np.histogram(y_,bins=10)
@@ -85,18 +87,22 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
                 mag_y = mag_y / mag_y.max()# / 10 * np.log(len(y_))
             else: # scatter
                 mag_y = 1
-            off_x = mag_y/(.6*spread) * (np.random.rand(len(y_))-.5) # random scattering amplitudes
+            rand_ = np.random.randn(len(y_))
+            rand_ /= np.abs(rand_).max()*1.6
+            off_x = mag_y/(.5*spread) * rand_ # random scattering amplitudes
             # plot
             x_ = (x_offset+n+.1) * np.ones(len(y_)) + off_x # x coords for scattering
             xticks.append(np.mean(x_))
             if mfc[x_ind+n]=='none':
-                ax.plot(x_, y_, markers[n], markersize=swarmPlot_kw['s'],
+                ax.plot(x_, y_, markers[n+x_ind],
+                    markersize=swarmPlot_kw['s'],
                     color=color_palette[n+x_ind],
                     marker=markers[n+x_ind],
                     mfc=mfc[x_ind+n],
                     alpha=swarmPlot_kw['alpha'])
             else:
-                ax.plot(x_, y_, markers[n], markersize=swarmPlot_kw['s'],
+                ax.plot(x_, y_, markers[n+x_ind],
+                    markersize=swarmPlot_kw['s'],
                     color=color_palette[n+x_ind],
                     marker=markers[n+x_ind],
                     alpha=swarmPlot_kw['alpha'])
@@ -110,12 +116,12 @@ def swarmplot(df, indeces, ax, vertical, spread=5, trend=1, operation=np.mean,
                          linewidth=swarmPlot_kw['err_width'])
             # store variables for trend plot
             ym.append(operation(y_)); xm.append(x_.mean())
-            xx.append(x_);  yy.append(y_)
+            xx.append(x_); yy.append(y_)
         x_offset+=n+1.1
         x_ind+=n+1
         
         if paired and trend: # paired plot
-            for n in range(ns):
+            for n in range(nss):
                 x2p = [xx[i][n] for i in range(nC)]
                 y2p = [yy[i][n] for i in range(nC)]
                 ax.plot(x2p, y2p, color=trendPlot_kw['color'],
@@ -182,7 +188,8 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
 
 
     # The bias correction value.
-    z0 = stats.norm.ppf( ( 1.0*np.sum(statarray < ostat, axis = 0)  ) / reps )
+    s0 = 1.0*np.sum(statarray < ostat, axis = 0) / reps
+    z0 = stats.norm.ppf(s0)
 
     # Statistics of the jackknife distribution
     jackindexes = jackknife_indexes(data[0])
@@ -205,8 +212,17 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
     avals = stats.norm.cdf(z0 + zs/(1-a*zs))
     nvals = np.round((reps-1)*avals)
     nvals = np.nan_to_num(nvals).astype('int')
-
-    return nvals
+    # obtain bca p value by running correction for various alphas
+    ns = []
+    for a_ in np.linspace(1e-10,1-1e-10,reps)[::-1]:
+        zs = z0 + stats.norm.ppf(a_).reshape(a_.shape+(1,)*z0.ndim)
+        avals = stats.norm.cdf(z0 + zs/(1-a*zs))
+        nvals_ = np.round((reps-1)*avals)
+        ns.append(np.nan_to_num(nvals_).astype('int'))
+    ci_alphas = np.asarray([statarray[ind] for ind in ns])
+    if np.all(ci_alphas>0): p_bca = 0
+    else: p_bca = 1 - np.where(ci_alphas<0)[0][0] / reps
+    return nvals , p_bca
 
 def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                     paired=False, BCA=True, nbins=100, ci=.95, spread=5, SMOOTH=[1,3],
@@ -234,11 +250,12 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
     try: bootPlot_kw['ref_ls']
     except: bootPlot_kw['ref_style'] = '--' # style of ref line
     
-    alphas = np.array([(1-ci)/2., 1-(1-ci)/2.])
+    alphas = np.array([(1-ci)/2., 1-(1-ci)/2.]) # conf interval
     x_offset = 0;  # x-axis offset for multiple controls
     x_ind = 1 # index for colors etc
     min_bc = []; max_bc = [] # mins and max values for y axis lims
     m_b = []; ci_b = [] # mean and ci of bootstrapped difference distribution
+    p = [] # p-value estimated from bootstrap resampling
     xticks = []
     
     for index in indeces: # loop over lists of groups (multiple controls)
@@ -247,6 +264,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         ref =  df[index[0]]
         # obtain stats for ref distribution
         ref = np.asarray(ref[~np.isnan(ref)])
+        ref = np.asarray(ref[~np.isinf(ref)])
         m_ref = bootstrap(ref, nsh=nsh, operation=operation) # bootstrap
         if paired: offset = 0
         else: offset = m_ref.mean()
@@ -257,11 +275,13 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         ax.hlines(0, start, fin, linewidth=bootPlot_kw['ref_width'],
                   linestyle=bootPlot_kw['ref_style'], color='k')
         x_offset+=1
-        m_b.append([]); ci_b.append([])
+        m_b.append([]); ci_b.append([]); p.append([])
         for n, i in enumerate(index[1:]): # loop over test groups
-            y_ = df[i]; y_ = np.asarray(y_[~np.isnan(y_)]) # exclude possible nans if unpaired analysis
+            y_ = df[i]
+            y_ = np.asarray(y_[~np.isnan(y_)]) # exclude possible nans if unpaired analysis
+            y_ = np.asarray(y_[~np.isinf(y_)]) # exclude possible infs (from log transforms)
             if paired:
-                m_ = bootstrap(y_-ref, nsh=nsh, operation=operation) # paired diff bootstrap
+                m_ = bootstrap(y_-m_ref.mean(), nsh=nsh, operation=operation) # paired diff bootstrap
             else:
                 m_ = bootstrap(y_, nsh=nsh, operation=operation) # bootstrap
             m_h = np.histogram(m_, bins=nbins)
@@ -285,13 +305,14 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             m_sort = np.sort(m_)
             CI = np.array([m_sort[ci_ind],m_sort[-ci_ind]]) - offset
             # obtain bias corrected estimate
-            if not paired and BCA:
-                bootdiff = m_ - m_ref
+            if paired: bootdiff = m_
+            else: bootdiff = m_ - m_ref.mean()
+            if BCA:
                 tdata = (bootdiff, )
                 bootsort = bootdiff.copy()
                 bootsort.sort()
-                summ_stat = operation(y_) - operation(ref) # simple difference
-                bca_ind = bca(tdata, alphas, bootsort,
+                summ_stat = operation(y_) - m_ref.mean() # simple difference
+                bca_ind,p_bca = bca(tdata, alphas, bootsort,
                            operation, summ_stat, nsh)
                 CI_ = bootsort[bca_ind]
                 ci_ratio = np.abs(np.diff(CI_)) / np.abs(np.diff(CI))
@@ -301,12 +322,17 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             else:
                 CI_ = CI
                 ci_ratio = 1
+            # obtain p value of bootstrap resample wo bca
+            ratio_ = np.sum(bootdiff>0) / nsh # ratio of how many samples are below the ref
+            if ratio_>.5: p_ = 1 - ratio_
+            else: p_ = ratio_
             # Plot distribution
             m_binCentres = (m_binCentres - m_binCentres.mean()) *\
                              np.sqrt(ci_ratio) + m_binCentres.mean() # scale wrt bca
             # m_pdf = m_pdf * np.sqrt(ci_ratio)
             m_b[-1].append(m_.mean()-offset)
             ci_b[-1].append([CI_[0], CI_[1]])
+            p[-1].append([p_,p_bca])
             xticks.append(n+x_offset+.1)
             ax.plot(n+x_offset+.1, m_b[-1][-1], 'ko',
                     markersize=bootPlot_kw['ci_size']) # plot black dot
@@ -332,7 +358,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         ax.yaxis.tick_right()
         ax.yaxis.set_label_position("right")
         
-    return ax, m_b, ci_b
+    return ax, m_b, ci_b, p
 
 
 
@@ -345,7 +371,8 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
                     FontScale=1, axs=None, figsize=None, stat=True):
     ''' INPUTS:
     - input_ = dict() containing the samples, indeces are labels
-    - indeces = list of indeces used for multiple control analysis;
+    - indeces = list of indeces used for multiple control anal
+    ysis;
             each list element contains the indeces of the samples to compare
             in each analysis -
             e.g. list(ind1,ind2) for 2 controls or list(ind) for just one control
@@ -498,24 +525,25 @@ def estimation_plot(input_, indeces, vertical=1, EXC=0, trend=1, spread=3, paire
                   gridspec_kw={'wspace': 0.1}, figsize=figsize)
     
     # Swarmplot
+    swarmPlot_kw['s'] = 8/np.log10(ns) # set marker size depending on sample size
     axs[0] = swarmplot(df, indeces, axs[0], vertical, spread=spread, trend=trend, paired=paired,
               operation=operation, swarmPlot_kw=swarmPlot_kw, trendPlot_kw=trendPlot_kw, 
               color_palette=color_palette)
     # Distribution plot
-    axs[1], m_b, ci_b = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
+    axs[1], m_b, ci_b, p = bootstrap_plot(df, indeces, axs[1], spread=spread, ci=ci, nbins=nbins,
                                        paired=paired, operation=operation, SMOOTH=SMOOTH,
                                        vertical=vertical, BCA=BCA, nsh=nsh, lbl_rot=lbl_rot,
                                        bootPlot_kw=bootPlot_kw, color_palette=color_palette)
     
     # set common x axis limits
     if nCols==2:
-        xlim = (-1/spread * (nCols), nCols-1 + 1.1/spread * 1.1*(nCols))
+        xlim = (-1/spread * (nCols), nCols-1 + 1.1/spread * 1.2*(nCols))
     else:
-        xlim = (-.2/spread * (nCols/2), nCols-1 + 1.1/spread * 1.1*(nCols/2))
+        xlim = (-.2/spread * (nCols/2), nCols-1 + 1.1/spread * 1.2*(nCols/2))
     axs[0].set_xlim(xlim); axs[1].set_xlim(xlim)
     if not vertical and not EXC:
         axs[1].set_xlim(xlim[0]+1, xlim[1])
     
-    if stat: return axs, m_b, ci_b
+    if stat: return axs, [m_b, ci_b], p
     else: return axs
 
