@@ -58,7 +58,7 @@ def swarmplot(df, indeces, ax, vertical=1, spread=3, trend=1, operation=np.mean,
     try:
         swarmPlot_kw['mfc']
     except:
-        swarmPlot_kw['mfc'] = color_palette
+        swarmPlot_kw['mfc'] = color_palette * 2
     try:
         swarmPlot_kw['err_width']
     except:
@@ -66,7 +66,7 @@ def swarmplot(df, indeces, ax, vertical=1, spread=3, trend=1, operation=np.mean,
     try:
         swarmPlot_kw['alpha']
     except:
-        swarmPlot_kw['alpha'] = .5
+        swarmPlot_kw['alpha'] = .8
     try:
         swarmPlot_kw['xticks']
     except:
@@ -318,9 +318,9 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
     for index in indeces:  # loop over lists of groups (multiple controls)
         nC = len(index)
         # plot control sample
-        ref = df[index[0]]
+        ref_ = df[index[0]]
         # obtain stats for ref distribution
-        ref = np.asarray(ref[~np.isnan(ref)])
+        ref = np.asarray(ref_[~np.isnan(ref_)])
         ref = np.asarray(ref[~np.isinf(ref)])
         m_ref = bootstrap(ref, nsh=nsh, operation=operation)  # bootstrap
         if paired:
@@ -343,7 +343,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             y_ = np.asarray(y_[~np.isnan(y_)])  # exclude possible nans if unpaired analysis
             y_ = np.asarray(y_[~np.isinf(y_)])  # exclude possible infs (from log transforms)
             if paired:
-                m_ = bootstrap(y_ - m_ref.mean(), nsh=nsh, operation=operation)  # paired diff bootstrap
+                m_ = bootstrap(y_-ref_, nsh=nsh, operation=operation)  # paired diff bootstrap
             else:
                 m_ = bootstrap(y_, nsh=nsh, operation=operation)  # bootstrap
             m_h = np.histogram(m_, bins=nbins)
@@ -376,7 +376,8 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                 tdata = (bootdiff,)
                 bootsort = bootdiff.copy()
                 bootsort.sort()
-                summ_stat = operation(y_) - m_ref.mean()  # simple difference
+                if paired: summ_stat = operation(y_)
+                else: summ_stat = operation(y_) - m_ref.mean() # simple difference
                 bca_ind, p_bca = bca(tdata, alphas, bootsort,
                                      operation, summ_stat, nsh)
                 CI_ = bootsort[bca_ind]
@@ -387,6 +388,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             else:
                 CI_ = CI
                 ci_ratio = 1
+                p_bca = np.nan
             # obtain p value of bootstrap resample wo bca
             ratio_ = np.sum(bootdiff > 0) / nsh  # ratio of how many samples are below the ref
             if ratio_ > .5:
