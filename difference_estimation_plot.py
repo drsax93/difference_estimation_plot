@@ -263,7 +263,8 @@ def bca(data, alphas, statarray, statfunction, ostat, reps):
     if np.all(ci_alphas > 0):
         p_bca = 0
     else:
-        p_bca = 1 - np.where(ci_alphas < 0)[0][0] / reps
+        try: p_bca = 1 - np.where(ci_alphas < 0)[0][0] / reps
+        except: p_bca = np.nan
     return nvals, p_bca
 
 
@@ -377,11 +378,14 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                 bootsort = bootdiff.copy()
                 bootsort.sort()
                 if paired: summ_stat = operation(y_)
-                else: summ_stat = operation(y_) - m_ref.mean() # simple difference
+                else: summ_stat = operation(y_) - operation(m_ref) # simple difference
                 bca_ind, p_bca = bca(tdata, alphas, bootsort,
                                      operation, summ_stat, nsh)
                 CI_ = bootsort[bca_ind]
                 ci_ratio = np.abs(np.diff(CI_)) / np.abs(np.diff(CI))
+                delta_ = np.mean(CI_ - CI)*ci_ratio
+                m_binCentres = m_binCentres - delta_
+                m_ = m_ - delta_
                 if ci_ratio == 0:  # bca correction failed
                     CI_ = CI
                     ci_ratio = 1
