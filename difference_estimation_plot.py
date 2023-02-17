@@ -348,7 +348,8 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             else:
                 m_ = bootstrap(y_, nsh=nsh, operation=operation)  # bootstrap
             m_h = np.histogram(m_, bins=nbins)
-            # obtain the centres of the hist bins
+            
+            # obtain the centres of the hist bins for the naive bootstrap diff
             m_binCentres = []
             for mn in range(len(m_h[0])):
                 m_binCentres.append(np.mean([m_h[1][mn + 1], m_h[1][mn]]))
@@ -357,6 +358,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             max_bc.append(np.max(m_binCentres) - offset)
             if SMOOTH[0]:  # smooth dist wit gaussian
                 m_h = gaussian_filter1d(m_h[0], SMOOTH[1])
+
             # obtain normalised dist to fit the swarmplot spread
             if len(index) > 2:  # if only two groups to be compared
                 m_pdf = m_h / (np.max(m_h) * (1.2 * spread))
@@ -368,24 +370,27 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             ci_ind = np.round((nsh - nsh * ci) / 2).astype(int)
             m_sort = np.sort(m_)
             CI = np.array([m_sort[ci_ind], m_sort[-ci_ind]]) - offset
+
             # obtain bias corrected estimate
+            # naive bootstrap difference
             if paired:
                 bootdiff = m_
             else:
-                bootdiff = m_ - m_ref.mean()
+                bootdiff = m_ - m_ref
             if BCA:
+                # format data for bca function
                 tdata = (bootdiff,)
                 bootsort = bootdiff.copy()
                 bootsort.sort()
-                if paired: summ_stat = operation(y_)
-                else: summ_stat = operation(y_) - operation(m_ref) # simple difference
+                # obtain simple statistics
+                if paired: summ_stat = operation(y_ - ref_)
+                else: summ_stat = operation(y_) - operation(ref_) # simple difference
+                # compute bca
                 bca_ind, p_bca = bca(tdata, alphas, bootsort,
                                      operation, summ_stat, nsh)
+                # update conf interval
                 CI_ = bootsort[bca_ind]
                 ci_ratio = np.abs(np.diff(CI_)) / np.abs(np.diff(CI))
-                delta_ = np.mean(CI_ - CI)*ci_ratio
-                m_binCentres = m_binCentres - delta_
-                m_ = m_ - delta_
                 if ci_ratio == 0:  # bca correction failed
                     CI_ = CI
                     ci_ratio = 1
@@ -393,12 +398,14 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
                 CI_ = CI
                 ci_ratio = 1
                 p_bca = np.nan
+
             # obtain p value of bootstrap resample wo bca
             ratio_ = np.sum(bootdiff > 0) / nsh  # ratio of how many samples are below the ref
             if ratio_ > .5:
                 p_ = 1 - ratio_
             else:
                 p_ = ratio_
+
             # Plot distribution
             m_binCentres = (m_binCentres - m_binCentres.mean()) * \
                            np.sqrt(ci_ratio) + m_binCentres.mean()  # scale wrt bca
@@ -413,6 +420,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             ax.vlines(n + x_offset + .1, CI_[0], CI_[1], color='k',
                       linewidth=bootPlot_kw['ci_width'])  # plot CI
             n_off = n  # save reference for offset
+
         # increase offsets / counters
         try:
             x_offset += n_off + 1.1
@@ -420,6 +428,7 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
         except:
             x_offset += 1.1
             x_ind += 1
+
     # labels and axes lims
     ax.set_xticks(xticks)
     ax.set_xticklabels(col_ids, rotation=lbl_rot)
@@ -463,7 +472,7 @@ def estimation_plot(input_, indeces=None, vertical=1, EXC=0, trend=1, spread=3, 
     - SWARM = set to 1 to plot a swarmplot, otherwise scatter uniformly
     - nsh = number of bootstrap samples
     - ci = confidence interval as ratio - e.g. .95
-    - nbins = number of bins to estimate bootsrap distribution
+    - nbins = number of bins to estimate bootstrap distribution
     - BCA = use BCa correction
     - SMOOTH = list of 2 elements, the first specifys whether to smooth the
             bootstrapped distribution, the second indicates the SD
