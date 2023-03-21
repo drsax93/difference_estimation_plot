@@ -304,8 +304,9 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
     except:
         bootPlot_kw['ref_style'] = '--'  # style of ref line
 
-    # SEt global params and initialise variables
-    alphas = np.array([(1 - ci) / 2., 1 - (1 - ci) / 2.])  # conf interval
+    # Set global params and initialise variables
+    if isinstance(ci,list):  alphas = np.array([ci[0], ci[1]])  # asymm conf interval
+    else: alphas = np.array([(1 - ci) / 2., 1 - (1 - ci) / 2.])  # symm conf interval
     x_offset = 0;  # x-axis offset for multiple controls
     x_ind = 1  # index for colors etc
     min_bc = [];
@@ -367,9 +368,9 @@ def bootstrap_plot(df, indeces, ax, operation=np.mean, nsh=10000, vertical=1,
             m_pdf[0] = 0
             m_pdf[-1] = 0  # make sure distribution touches CI line
             # find confident interval - take samples from sorted dist
-            ci_ind = np.round((nsh - nsh * ci) / 2).astype(int)
+            ci_ind = np.round(nsh * alphas).astype(int)
             m_sort = np.sort(m_)
-            CI = np.array([m_sort[ci_ind], m_sort[-ci_ind]]) - offset
+            CI = np.array([m_sort[ci_ind[0]], m_sort[ci_ind[1]]]) - offset
 
             # obtain bias corrected estimate
             # naive bootstrap difference
